@@ -13,15 +13,21 @@ def approval():
 
     is_creator = Txn.sender() == Global.creator_address()
 
+    # require 1 arg as asset id
+    #  sets globals
+    #   asset_id arg0
+    #   creator_address this 
     on_creation = Seq(  # no risk
         [
             Assert(Txn.application_args.length() == Int(1)),  # limit the number of txn args for security
-            App.globalPut(asset_id, Btoi(Txn.application_args[0])),  # limits the contract to one token from the beninging
-            App.globalPut(receiver, Global.creator_address()),  # limits the contract to one algo receiver from the beninging
-            Return(Int(1)),
+            App.globalPut(asset_id, Btoi(Txn.application_args[0])),  # limits the contract to one token from the beginning
+            App.globalPut(receiver, Global.creator_address()),  # limits the contract to one algo receiver from the beginning
+            Return(Int(1)), # ? why return 1
         ]
     )
 
+    # require creator
+    #  opt into asset
     opt_in = Seq(  # private
         # only the creator can use this, low risk, otherwise people may opt the contract into a bunch of things
         [   
@@ -38,6 +44,8 @@ def approval():
         ]
     )
 
+    # require anybody
+    #  buy asset
     buy_px = Seq(  # public
         [   
             # Safety Checks
