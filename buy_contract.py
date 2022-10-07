@@ -5,7 +5,6 @@ from pyteal_helpers import program
 
 def approval():
     # globals
-    receiver = Bytes("rec")  # bytes
     asset_id = Bytes("aid")  # uint64
 
     op_buy_px = Bytes("buy")
@@ -17,7 +16,6 @@ def approval():
         [
             Assert(Txn.application_args.length() == Int(1)),  # limit the number of txn args for security
             App.globalPut(asset_id, Btoi(Txn.application_args[0])),  # limits the contract to one token from the beninging
-            App.globalPut(receiver, Global.creator_address()),  # limits the contract to one algo receiver from the beninging
             Return(Int(1)),
         ]
     )
@@ -52,17 +50,18 @@ def approval():
             # don't have to worry about closeouts, neither group txn is an asset transfer
             # should be fine to just check the txn type because only opted into 1 asset (sending algos is fine too I guess)
             Assert(Gtxn[0].type_enum() == TxnType.Payment),
+            Assert(Gtxn[1].type_enum() == TxnType.ApplicationCall),
             # make sure they're sending assets only to the receiver addr
-            Assert(Gtxn[0].receiver() ==  App.globalGet(receiver)),  # give algo to me so contract doesn't hold it
+            Assert(Gtxn[0].receiver() ==  Global.creator_address()),  # give algo to me so contract doesn't hold it
             Assert(Gtxn[0].amount() >= Int(250000)), # microalgos, make sure they are purchasing greater than the minimum qt.
-            Assert(Txn.application_args.length() == Int(1)),  # need one for the noop buy_px
+            Assert(Gtxn[1].application_args.length() == Int(1)),  # need one for the noop buy_px
 
             InnerTxnBuilder.Begin(),
             InnerTxnBuilder.SetFields({
                 TxnField.type_enum: TxnType.AssetTransfer,
                 TxnField.asset_receiver: Gtxn[0].sender(),  # send to the addr that paid the algo
                 TxnField.asset_amount: Gtxn[0].amount()*Int(4),  # automatically applies floor function, /250000 if no decimals (25000-499999 --> 1, 500000-999999 --> 2)
-                TxnField.xfer_asset: Txn.assets[0], # Must be in the assets array sent as part of the application call
+                TxnField.xfer_asset: Gtxn[1].assets[0], # Must be in the assets array sent as part of the application call
             }),
             InnerTxnBuilder.Submit(),
             Approve(),
